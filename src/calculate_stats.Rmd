@@ -1,0 +1,943 @@
+---
+title: "Court reminders paper stats and plot generator"
+author: "Alex Chohlas-Wood"
+output: latex_fragment
+editor_options: 
+  chunk_output_type: console
+---
+
+```{=latex}
+
+% NOTE:     
+% This is an auto-generated file in R. 
+% DO NOT manually edit values in the .tex version of this file. 
+% Instead, edit the stats.Rmd file and re-knit the file to create the .tex version.
+
+```
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(broom)
+library(janitor)
+library(glue)
+library(stargazer)
+library(kableExtra)
+library(here)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = here::here())
+theme_set(theme_bw())
+```
+
+```{r source_files, include=FALSE}
+source(here::here("src", "evaluation.R"))
+source(here::here("src/utils.R"))
+```
+
+```{r import_data, include=FALSE}
+comparison_pops <- 
+  read_csv("data/comparison_populations.csv")
+text_costs_mar_2023 <- 
+  read_csv("data/text_costs_mar_2023.csv")
+events_per_case <- 
+  read_csv("data/events_per_case.csv")
+opt_out_behavior <- 
+  read_csv("data/opt_outs.csv")
+```
+
+```{r experiment_counts_R, include=FALSE}
+
+# Overall counts
+client_counts <- experiment_pop %>% 
+  distinct(client_id, assignment_arm) %>% 
+  count(assignment_arm) %>% 
+  adorn_totals()
+
+num_clients_total <- client_counts %>% 
+  filter(assignment_arm == "Total") %>% 
+  pull() %>% comma()
+num_clients_short <- client_counts %>%
+  filter(assignment_arm == "short_texts") %>% 
+  pull() 
+num_clients_short_str <- num_clients_short %>% 
+  comma()
+num_clients_control <- client_counts %>% 
+  filter(assignment_arm == "control") %>% 
+  pull() 
+num_clients_control_str <- num_clients_control %>% 
+  comma()
+
+client_phase_counts <- experiment_pop %>% 
+  distinct(client_id, experiment_phase) %>% 
+  count(experiment_phase)
+
+num_clients_first_phase <- client_phase_counts %>% 
+  filter(experiment_phase == "first experiment") %>% 
+  pull(n) %>% comma()
+num_clients_second_phase <- client_phase_counts %>% 
+  filter(experiment_phase == "second experiment") %>% 
+  pull(n) %>% comma()
+
+```
+```{=latex }
+\newcommand\numClientsTotal{`r num_clients_total`}
+\newcommand\numClientsShort{`r num_clients_short_str`}
+\newcommand\numClientsControl{`r num_clients_control_str`}
+\newcommand\numClientsFirstPhase{`r num_clients_first_phase`}
+\newcommand\numClientsSecondPhase{`r num_clients_second_phase`}
+```
+
+```{r bw_rates, include=FALSE}
+experiment_bw_rates <- experiment_pop %>% 
+  group_by(assignment_arm) %>% 
+  summarize(bw_rate = mean(bw_issued_first_cd))
+bw_rate_control <- experiment_bw_rates %>% 
+  filter(assignment_arm == "control") %>% 
+  select(bw_rate) %>% pull() 
+bw_rate_control_str <- bw_rate_control %>% 
+  latex_percent()
+bw_rate_short <- experiment_bw_rates %>% 
+  filter(assignment_arm == "short_texts") %>% 
+  select(bw_rate) %>% pull() 
+bw_rate_short_str <- bw_rate_short %>% 
+  latex_percent()
+
+bw_rate_raw_pp_diff <- 
+  (bw_rate_control - bw_rate_short)
+bw_rate_raw_pp_diff_str <- 
+  bw_rate_raw_pp_diff %>% 
+  latex_pp()
+bw_rate_raw_diff_se <-
+  sqrt(((bw_rate_control * (1 - bw_rate_control)) / 
+        num_clients_control) +
+       ((bw_rate_short * (1 - bw_rate_short)) / 
+        num_clients_short))
+bw_rate_raw_pp_diff_ci_lower <- 
+  (bw_rate_raw_pp_diff - 1.96 * bw_rate_raw_diff_se) %>% 
+  latex_pp()
+bw_rate_raw_pp_diff_ci_upper <- 
+  (bw_rate_raw_pp_diff + 1.96 * bw_rate_raw_diff_se) %>% 
+  latex_pp()
+bw_rate_raw_pp_diff_ci <- 
+  glue("{bw_rate_raw_pp_diff_ci_lower}--{bw_rate_raw_pp_diff_ci_upper}")
+bw_rate_raw_relative_diff_str <- 
+  (1 - bw_rate_short / bw_rate_control) %>% 
+  latex_percent()
+
+
+```
+```{=latex}
+\newcommand\bwRateControl{`r bw_rate_control_str`}
+\newcommand\bwRateShort{`r bw_rate_short_str`}
+\newcommand\bwRateRawPPDiff{`r bw_rate_raw_pp_diff_str`}
+\newcommand\bwRateRawPPCI{`r bw_rate_raw_pp_diff_ci`}
+\newcommand\bwRateRawRelativeDiff{`r bw_rate_raw_relative_diff_str`}
+```
+
+```{r bw_any_rates, include=FALSE}
+experiment_any_bw_rates <- experiment_pop %>% 
+  group_by(assignment_arm) %>% 
+  summarize(bw_rate = mean(bw_issued_any_cd))
+bw_any_rate_control <- experiment_any_bw_rates %>% 
+  filter(assignment_arm == "control") %>% 
+  select(bw_rate) %>% pull() 
+bw_any_rate_control_str <- bw_any_rate_control %>% 
+  latex_percent()
+bw_any_rate_short <- experiment_any_bw_rates %>% 
+  filter(assignment_arm == "short_texts") %>% 
+  select(bw_rate) %>% pull() 
+bw_any_rate_short_str <- bw_any_rate_short %>% 
+  latex_percent()
+
+bw_any_rate_raw_pp_diff <- 
+  (bw_any_rate_control - bw_any_rate_short)
+bw_any_rate_raw_pp_diff_str <- 
+  bw_any_rate_raw_pp_diff %>% 
+  latex_pp()
+bw_any_rate_raw_diff_se <-
+  sqrt(((bw_any_rate_control * (1 - bw_any_rate_control)) / 
+        num_clients_control) +
+       ((bw_any_rate_short * (1 - bw_any_rate_short)) / 
+        num_clients_short))
+bw_any_rate_raw_pp_diff_ci_lower <- 
+  (bw_any_rate_raw_pp_diff - 1.96 * bw_any_rate_raw_diff_se) %>% 
+  latex_pp()
+bw_any_rate_raw_pp_diff_ci_upper <- 
+  (bw_any_rate_raw_pp_diff + 1.96 * bw_any_rate_raw_diff_se) %>% 
+  latex_pp()
+bw_any_rate_raw_pp_diff_ci <- 
+  glue("{bw_any_rate_raw_pp_diff_ci_lower}--{bw_any_rate_raw_pp_diff_ci_upper}")
+bw_any_rate_raw_relative_diff_str <- 
+  (1 - bw_any_rate_short / bw_any_rate_control) %>% 
+  latex_percent()
+
+
+```
+```{=latex}
+\newcommand\bwAnyRateControl{`r bw_any_rate_control_str`}
+\newcommand\bwAnyRateShort{`r bw_any_rate_short_str`}
+\newcommand\bwAnyRateRawPPDiff{`r bw_any_rate_raw_pp_diff_str`}
+\newcommand\bwAnyRateRawPPCI{`r bw_any_rate_raw_pp_diff_ci`}
+\newcommand\bwAnyRateRawRelativeDiff{`r bw_any_rate_raw_relative_diff_str`}
+```
+
+```{r incarceration_rates, include=FALSE}
+
+experiment_incarceration_rates <- experiment_pop %>% 
+  group_by(assignment_arm) %>% 
+  summarize(incarceration_rate = mean(any_solo_bw_remand))
+incarceration_rate_control <- experiment_incarceration_rates %>% 
+  filter(assignment_arm == "control") %>% 
+  select(incarceration_rate) %>% pull() 
+incarceration_rate_control_str <- incarceration_rate_control %>% 
+  latex_percent()
+incarceration_rate_short <- experiment_incarceration_rates %>% 
+  filter(assignment_arm == "short_texts") %>% 
+  select(incarceration_rate) %>% pull() 
+incarceration_rate_short_str <- incarceration_rate_short %>% 
+  latex_percent()
+
+incarceration_rate_raw_pp_diff <- 
+  (incarceration_rate_control - incarceration_rate_short)
+incarceration_rate_raw_pp_diff_str <- 
+  incarceration_rate_raw_pp_diff %>% 
+  latex_pp()
+incarceration_rate_raw_diff_se <-
+  sqrt(((incarceration_rate_control * (1 - incarceration_rate_control)) / 
+        num_clients_control) +
+       ((incarceration_rate_short * (1 - incarceration_rate_short)) / 
+        num_clients_short))
+incarceration_rate_raw_pp_diff_ci_lower <- 
+  (incarceration_rate_raw_pp_diff - 1.96 * incarceration_rate_raw_diff_se) %>% 
+  latex_pp()
+incarceration_rate_raw_pp_diff_ci_upper <- 
+  (incarceration_rate_raw_pp_diff + 1.96 * incarceration_rate_raw_diff_se) %>% 
+  latex_pp()
+incarceration_rate_raw_pp_diff_ci <- 
+  glue("{incarceration_rate_raw_pp_diff_ci_lower}--{incarceration_rate_raw_pp_diff_ci_upper}")
+incarceration_rate_raw_relative_diff_str <- 
+  (1 - incarceration_rate_short / incarceration_rate_control) %>% 
+  latex_percent()
+
+
+```
+```{=latex}
+\newcommand\incarcerationRateControl{`r incarceration_rate_control_str`}
+\newcommand\incarcerationRateShort{`r incarceration_rate_short_str`}
+\newcommand\incarcerationRateRawPPDiff{`r incarceration_rate_raw_pp_diff_str`}
+\newcommand\incarcerationRateRawPPCI{`r incarceration_rate_raw_pp_diff_ci`}
+\newcommand\incarcerationRateRawRelativeDiff{`r incarceration_rate_raw_relative_diff_str`}
+```
+
+
+```{r unadjusted_bw_effects, include=FALSE}
+
+simple_bw_effect_estimates <- 
+  model_reduced_first_cd %>% 
+  convert_logodds() %>% 
+  filter(term == "assignment_armshort_texts")
+simple_bw_effect_odds_ratio_str <- simple_bw_effect_estimates %>% 
+  pull(estimate_exp) %>% 
+  number(accuracy = 0.001)
+simple_bw_effect_odds_ratio_se_str <- 
+  simple_bw_effect_estimates %>% 
+  mutate(std_error_exp_delta = ((estimate_exp ^ 2) * (std_error ^ 2)) ^ 0.5) %>% 
+  pull(std_error_exp_delta) %>% 
+  number(accuracy = 0.001) 
+simple_bw_effect_stars <- 
+  simple_bw_effect_estimates %>% 
+  pull(p_value) %>% 
+  pval_to_stars()
+
+```
+```{=latex}
+\newcommand\simpleBWEffectEst{`r simple_bw_effect_odds_ratio_str`}
+\newcommand\simpleBWEffectSE{`r simple_bw_effect_odds_ratio_se_str`}
+\newcommand\simpleBWEffectStars{`r simple_bw_effect_stars`}
+```
+
+```{r unadjusted_any_bw_effects, include=FALSE}
+
+simple_any_bw_effect_estimates <- 
+  model_reduced_any_cd %>% 
+  convert_logodds() %>% 
+  filter(term == "assignment_armshort_texts")
+simple_any_bw_effect_odds_ratio_str <- simple_any_bw_effect_estimates %>% 
+  pull(estimate_exp) %>% 
+  number(accuracy = 0.001)
+simple_any_bw_effect_odds_ratio_se_str <- 
+  simple_any_bw_effect_estimates %>% 
+  mutate(std_error_exp_delta = ((estimate_exp ^ 2) * (std_error ^ 2)) ^ 0.5) %>% 
+  pull(std_error_exp_delta) %>% 
+  number(accuracy = 0.001) 
+simple_any_bw_effect_stars <- 
+  simple_any_bw_effect_estimates %>% 
+  pull(p_value) %>% 
+  pval_to_stars()
+
+```
+```{=latex}
+\newcommand\simpleAnyBWEffectEst{`r simple_any_bw_effect_odds_ratio_str`}
+\newcommand\simpleAnyBWEffectSE{`r simple_any_bw_effect_odds_ratio_se_str`}
+\newcommand\simpleAnyBWEffectStars{`r simple_any_bw_effect_stars`}
+```
+
+```{r unadjusted_incarceration_effects, include=FALSE}
+
+simple_incarceration_effect_estimates <- 
+  model_incarceration_simple %>% 
+  convert_logodds() %>% 
+  filter(term == "assignment_armshort_texts")
+simple_incarceration_effect_odds_ratio_str <- simple_incarceration_effect_estimates %>% 
+  pull(estimate_exp) %>% 
+  number(accuracy = 0.001)
+simple_incarceration_effect_odds_ratio_se_str <- 
+  simple_incarceration_effect_estimates %>% 
+  mutate(std_error_exp_delta = ((estimate_exp ^ 2) * (std_error ^ 2)) ^ 0.5) %>% 
+  pull(std_error_exp_delta) %>% 
+  number(accuracy = 0.001) 
+simple_incarceration_effect_stars <- 
+  simple_incarceration_effect_estimates %>% 
+  pull(p_value) %>% 
+  pval_to_stars()
+
+```
+```{=latex}
+\newcommand\simpleIncarcerationEffectEst{`r simple_incarceration_effect_odds_ratio_str`}
+\newcommand\simpleIncarcerationEffectSE{`r simple_incarceration_effect_odds_ratio_se_str`}
+\newcommand\simpleIncarcerationEffectStars{`r simple_incarceration_effect_stars`}
+```
+
+
+```{r adjusted_bw_effects, include=FALSE}
+
+# Source for computing SE: 
+# https://www.r-bloggers.com/2018/01/delta-method-standard-errors/
+
+# First court date
+main_bw_effect_estimates <- 
+  model_first_cd %>% 
+  convert_logodds() %>% 
+  filter(term == "assignment_armshort_texts")
+main_bw_effect_odds_ratio <- main_bw_effect_estimates %>% 
+  pull(estimate_exp) 
+main_bw_effect_odds_ratio_str <- main_bw_effect_odds_ratio %>% 
+  number(accuracy = 0.001)
+main_bw_effect_odds_ratio_upper_ci_str <- 
+  main_bw_effect_estimates %>% pull(estimate_upper_ci_exp) %>% 
+  number(accuracy = 0.01)
+main_bw_effect_odds_ratio_lower_ci_str <- 
+  main_bw_effect_estimates %>% pull(estimate_lower_ci_exp) %>% 
+  number(accuracy = 0.01)
+main_bw_effect_odds_ratio_ci_str <- 
+  glue("{main_bw_effect_odds_ratio_lower_ci_str}--{main_bw_effect_odds_ratio_upper_ci_str}")
+main_bw_effect_treat_odds <- main_bw_effect_odds_ratio * 
+  (bw_rate_control / (1 - bw_rate_control))
+main_bw_effect_treat_estimate <- 
+  main_bw_effect_treat_odds / (1 + main_bw_effect_treat_odds)
+main_bw_effect_pp <- 
+  bw_rate_control - main_bw_effect_treat_estimate
+main_bw_effect_pp_str <- main_bw_effect_pp %>% 
+  latex_pp()
+main_bw_effect_relative_str <- 
+  (1- main_bw_effect_treat_estimate / bw_rate_control) %>% 
+  latex_percent()
+main_bw_effect_odds_ratio_se_str <- 
+  main_bw_effect_estimates %>% 
+  mutate(std_error_exp_delta = ((estimate_exp ^ 2) * (std_error ^ 2)) ^ 0.5) %>% 
+  pull(std_error_exp_delta) %>% 
+  number(accuracy = 0.001) 
+main_bw_effect_stars <- 
+  main_bw_effect_estimates %>% 
+  pull(p_value) %>% 
+  pval_to_stars()
+
+```
+```{=latex}
+% Estimated effects: plain English
+\newcommand\mainBWEffectOddsRatio{`r main_bw_effect_odds_ratio_str`}
+\newcommand\mainBWEffectOddsRatioCI{`r main_bw_effect_odds_ratio_ci_str`}
+\newcommand\mainBWEffectPP{`r main_bw_effect_pp_str`}
+\newcommand\mainBWEffectRelative{`r main_bw_effect_relative_str`}
+
+% Estimated effects: regression table
+\newcommand\mainBWEffectEst{`r main_bw_effect_odds_ratio_str`}
+\newcommand\mainBWEffectSE{`r main_bw_effect_odds_ratio_se_str`}
+\newcommand\mainBWEffectStars{`r main_bw_effect_stars`}
+
+```
+
+```{r adjusted_bw_any_effects, include=FALSE}
+
+# First court date
+main_bw_any_effect_estimates <- 
+  model_any_cd %>% 
+  convert_logodds() %>% 
+  filter(term == "assignment_armshort_texts")
+main_bw_any_effect_odds_ratio <- main_bw_any_effect_estimates %>% 
+  pull(estimate_exp) 
+main_bw_any_effect_odds_ratio_str <- main_bw_any_effect_odds_ratio %>% 
+  number(accuracy = 0.001)
+
+main_bw_any_effect_odds_ratio_se_str <- 
+  main_bw_any_effect_estimates %>% 
+  mutate(std_error_exp_delta = ((estimate_exp ^ 2) * (std_error ^ 2)) ^ 0.5) %>% 
+  pull(std_error_exp_delta) %>% 
+  number(accuracy = 0.001) 
+main_bw_any_effect_stars <- 
+  main_bw_any_effect_estimates %>% 
+  pull(p_value) %>% 
+  pval_to_stars()
+
+```
+```{=latex}
+% Estimated effects: regression table
+\newcommand\mainAnyBWEffectEst{`r main_bw_any_effect_odds_ratio_str`}
+\newcommand\mainAnyBWEffectSE{`r main_bw_any_effect_odds_ratio_se_str`}
+\newcommand\mainAnyBWEffectStars{`r main_bw_any_effect_stars`}
+
+```
+
+```{r adjusted_incarceration_effects, include=FALSE}
+
+# Source for computing SE: 
+# https://www.r-bloggers.com/2018/01/delta-method-standard-errors/
+
+# Incarceration
+# First, get results in exponentiated odds ratios
+main_incarceration_effect_estimates <- 
+  model_incarceration %>% 
+  convert_logodds() %>% 
+  filter(term == "assignment_armshort_texts")
+main_incarceration_effect_odds_ratio <- main_incarceration_effect_estimates %>% 
+  pull(estimate_exp) 
+main_incarceration_effect_odds_ratio_str <- main_incarceration_effect_odds_ratio %>% 
+  number(accuracy = 0.001)
+main_incarceration_effect_odds_ratio_upper_ci_str <- 
+  main_incarceration_effect_estimates %>% pull(estimate_upper_ci_exp) %>% 
+  number(accuracy = 0.01)
+main_incarceration_effect_odds_ratio_lower_ci_str <- 
+  main_incarceration_effect_estimates %>% pull(estimate_lower_ci_exp) %>% 
+  number(accuracy = 0.01)
+main_incarceration_effect_odds_ratio_ci_str <- 
+  glue("{main_incarceration_effect_odds_ratio_lower_ci_str}--{main_incarceration_effect_odds_ratio_upper_ci_str}")
+
+# Get estimated impact from model, using control rate as baseline
+main_incarceration_effect_treat_odds <- main_incarceration_effect_odds_ratio * 
+  (incarceration_rate_control / (1 - incarceration_rate_control))
+main_incarceration_effect_treat_estimate <- 
+  main_incarceration_effect_treat_odds / (1 + main_incarceration_effect_treat_odds)
+main_incarceration_effect_pp <- 
+  incarceration_rate_control - main_incarceration_effect_treat_estimate
+main_incarceration_effect_pp_str <- main_incarceration_effect_pp %>% 
+  latex_pp()
+main_incarceration_effect_relative_str <- 
+  (1- main_incarceration_effect_treat_estimate / incarceration_rate_control) %>% 
+  latex_percent()
+main_incarceration_effect_odds_ratio_se_str <- 
+  main_incarceration_effect_estimates %>% 
+  mutate(std_error_exp_delta = ((estimate_exp ^ 2) * (std_error ^ 2)) ^ 0.5) %>% 
+  pull(std_error_exp_delta) %>% 
+  number(accuracy = 0.001) 
+main_incarceration_effect_stars <- 
+  main_incarceration_effect_estimates %>% 
+  pull(p_value) %>% 
+  pval_to_stars()
+
+```
+```{=latex}
+% Estimated effects: plain English
+\newcommand\mainIncarcerationEffectOddsRatio{`r main_incarceration_effect_odds_ratio_str`}
+\newcommand\mainIncarcerationEffectOddsRatioCI{`r main_incarceration_effect_odds_ratio_ci_str`}
+\newcommand\mainIncarcerationEffectPP{`r main_incarceration_effect_pp_str`}
+\newcommand\mainIncarcerationEffectRelative{`r main_incarceration_effect_relative_str`}
+
+% Estimated effects: regression table
+\newcommand\mainIncarcerationEffectEst{`r main_incarceration_effect_odds_ratio_str`}
+\newcommand\mainIncarcerationEffectSE{`r main_incarceration_effect_odds_ratio_se_str`}
+\newcommand\mainIncarcerationEffectStars{`r main_incarceration_effect_stars`}
+
+```
+
+```{r average_cost_of_texts, include=FALSE}
+
+# Calculate mean cost of texts over a couple weeks in Mar 2023
+average_cost_per_cd <- text_costs_mar_2023 %>% 
+  summarize(mean_total_cost = mean(total_cost) * -100,
+            .groups = "drop") %>%
+  pull(mean_total_cost)
+
+# Calculate mean number of court dates per case since 2019
+# (Also a rough approximation)
+cds_per_case <- events_per_case %>%
+  summarize(mean_cds = mean(num_events)) %>%
+  pull()
+
+# Round to the nearest 10 cents,
+# since we're dealing with rough approximations
+average_cost_per_case <- round(cds_per_case * average_cost_per_cd, digits = -1) %>%
+  dollar(prefix = "", suffix = "¢", decimal.mark = ".", largest_with_cents = 1)
+
+```
+```{=latex}
+\newcommand\avgCostPerCase{`r average_cost_per_case`}
+```
+
+```{r other_random_stats, include=FALSE}
+
+# Preregistered analysis rates
+experiment_short_long_rates <- prereg_pop %>% 
+  group_by(assignment_arm) %>% 
+  summarize(bw_rate = mean(bw_issued))
+bw_rate_long_template_01a <- experiment_short_long_rates %>% 
+  filter(assignment_arm == "long_template_01a") %>% 
+  select(bw_rate) %>% pull() %>% latex_percent()
+bw_rate_short_template_01a <- experiment_short_long_rates %>% 
+  filter(assignment_arm == "short_template_01a") %>% 
+  select(bw_rate) %>% pull() %>% latex_percent()
+
+# Number of clients without reminders
+num_clients_with_no_reminders_short <- experiment_pop %>% 
+  group_by(assignment_arm) %>% 
+  summarize(num = n(),
+            num_without_reminders = num - sum(reminder_sent),
+            pct_without_reminders = num_without_reminders / num) %>% 
+  filter(assignment_arm == "short_texts") %>% 
+  pull(num_without_reminders)
+
+
+# Response behavior in short arm
+opt_out_stats <- opt_out_behavior %>%
+  count(opt_out_type)
+
+num_opt_out <- opt_out_stats %>% 
+  summarize(num_opt_out = sum(n)) %>% 
+  pull(num_opt_out)
+
+num_stop <- opt_out_stats %>% 
+  filter(opt_out_type == "stop") %>% 
+  pull(n)
+
+num_wrong_number <- opt_out_stats %>% 
+  filter(opt_out_type == "wrong_number") %>% 
+  pull(n)
+
+confirmation_behavior <- experiment_pop %>% 
+  filter(assignment_arm == "short_texts") %>% 
+  mutate(reminder_confirmed = replace_na(reminder_confirmed, FALSE)) %>%
+  group_by(reminder_confirmed = reminder_confirmed == TRUE) %>% 
+  summarize(n = n(), 
+            bw_issued_first_cd = sum(bw_issued_first_cd), 
+            bw_rate = bw_issued_first_cd / n,
+            .groups = "drop") %>% 
+  mutate(pct_of_short = n / sum(n))
+
+pct_short_confirmed <- confirmation_behavior %>% 
+  filter(reminder_confirmed == TRUE) %>% 
+  select(pct_of_short) %>% pull()
+
+pct_short_confirmed_str <- pct_short_confirmed %>% 
+  percent(accuracy = 1, suffix = "\\%")
+
+pct_short_unconfirmed_str <- (1 - pct_short_confirmed) %>% 
+  percent(accuracy = 1, suffix = "\\%")
+
+bw_rate_short_confirmed <- confirmation_behavior %>% 
+  filter(reminder_confirmed == TRUE) %>% 
+  select(bw_rate) %>% pull() %>% 
+  latex_percent()
+
+bw_rate_short_unconfirmed <- confirmation_behavior %>% 
+  filter(reminder_confirmed != TRUE | is.na(reminder_confirmed)) %>% 
+  select(bw_rate) %>% pull() %>% 
+  latex_percent()
+
+# Pct of non-English speakers
+pct_non_english <- experiment_pop %>% 
+  summarize(mean(prefers_english == FALSE)) %>% 
+  pull() %>% 
+  percent(accuracy = 1, suffix = "\\%")
+
+# Number of crime types
+num_crime_types <- experiment_pop %>% 
+  select(contains("charge_category")) %>% 
+  pivot_longer(everything()) %>% 
+  summarize(n_distinct(name)) %>% 
+  pull()
+
+```
+```{=latex}
+\newcommand\bwRateLongPrereg{`r bw_rate_long_template_01a`}
+\newcommand\bwRateShortPrereg{`r bw_rate_short_template_01a`}
+
+\newcommand\numClientsNoReminderInShort{`r num_clients_with_no_reminders_short`}
+
+\newcommand\numOptOut{`r num_opt_out`}
+\newcommand\numOptOutStop{`r num_stop`}
+\newcommand\numOptOutWrongNumber{`r num_wrong_number`}
+
+\newcommand\pctShortConfirmed{`r pct_short_confirmed_str`}
+\newcommand\pctShortUnconfirmed{`r pct_short_unconfirmed_str`}
+\newcommand\bwRateShortConfirmed{`r bw_rate_short_confirmed`}
+\newcommand\bwRateShortUnconfirmed{`r bw_rate_short_unconfirmed`}
+
+\newcommand\pctNonEnglish{`r pct_non_english`}
+
+\newcommand\numCrimeTypes{`r num_crime_types`}
+```
+
+```{r create_regression_model_tables, include=FALSE}
+
+coefficient_data <- 
+  bind_rows(model_first_cd      %>% tidy() %>% mutate(model = "(1)"),
+          model_any_cd          %>% tidy() %>% mutate(model = "(3)"),
+          model_incarceration   %>% tidy() %>% mutate(model = "(5)")) %>% 
+  mutate(grouping = case_when(str_detect(term, "Intercept")   ~ "00_intercept",
+                              str_detect(term, "assignment")  ~ "01_treatment",
+                              str_detect(term, "race")        ~ "02_client_race/ethnicity",
+                              str_detect(term, "male")        ~ "03_client_information",
+                              str_detect(term, "^age_")       ~ "04_client_information",
+                              str_detect(term, "english")     ~ "05_client_information",
+                              str_detect(term, "mental")      ~ "05_client_information",
+                              str_detect(term, "new_client")  ~ "05_client_information",
+                              str_detect(term, "time_since")  ~ "06_client_information",
+                              str_detect(term, "distance_")   ~ "07_client_information",
+                              str_detect(term, "num_prev")    ~ "08_client_history_(5_yr_counts)",
+                              str_detect(term, "5_year")      ~ "08_client_history_(5_yr_counts)",
+                              str_detect(term, "day_of")      ~ "09_day_of_week",
+                              str_detect(term, "month")       ~ "10_month",
+                              str_detect(term, "appearance")  ~ "11_court_date_info",
+                              str_detect(term, "case_type")   ~ "12_case_severity",
+                              str_detect(term, "courthouse_") ~ "13_courthouse",
+                              str_detect(term, "charge_")     ~ "14_charges"),
+         clean_term = case_when(term == "(Intercept)"                                             ~ "1_-",
+                                term == "assignment_armshort_texts"                               ~ "1_reminders",
+                                term == "raceAsian"                                               ~ "1_asian",
+                                term == "raceBlack"                                               ~ "2_black",  
+                                term == "raceHispanic"                                            ~ "3_hispanic",
+                                term == "raceNative"                                              ~ "4_native",
+                                term == "raceOther"                                               ~ "5_other",
+                                term == "is_non_maleTRUE"                                         ~ "1_is_not_male",
+                                term == "age_interacted"                                          ~ "1_age",
+                                term == "mental_healthTRUE"                                       ~ "2_mental_health",
+                                term == "new_clientTRUE"                                          ~ "3_new_client",
+                                term == "prefers_englishFALSE"                                    ~ "4_prefers_english",
+                                term == "time_since_phone_update"                                 ~ "5_years_since_phone_added",
+                                term == "distance_to_courthouse_existsTRUE"                       ~ "6_home_address_recorded",
+                                term == "distance_to_courthouse_interacted"                       ~ "7_miles_from_home_to_court",
+                                term == "appearance_seq_num"                                      ~ "1_appearance_number",
+                                term == "appts_5_year_window_inv"                                 ~ "2_1/court_dates",
+                                term == "bws_5_year_window"                                       ~ "3_bench_warrants",
+                                term == "bws_5_year_window:appts_5_year_window_inv"               ~ "4_bench_warrants/court_dates",
+                                term == "num_prev_cases"                                          ~ "1_cases",
+                                term == "num_prev_convictions"                                    ~ "1_convictions",
+                                term == "day_of_weekMon"                                          ~ "1_monday",
+                                term == "day_of_weekTue"                                          ~ "2_tuesday",
+                                term == "day_of_weekWed"                                          ~ "3_wednesday",
+                                term == "day_of_weekThu"                                          ~ "4_thursday",
+                                term == "monthFeb"                                                ~ "02_february",
+                                term == "monthMar"                                                ~ "03_march",
+                                term == "monthApr"                                                ~ "04_april",
+                                term == "monthMay"                                                ~ "05_may",
+                                term == "monthJun"                                                ~ "06_june",
+                                term == "monthJul"                                                ~ "07_july",
+                                term == "monthAug"                                                ~ "08_august",
+                                term == "monthSep"                                                ~ "09_september",
+                                term == "monthOct"                                                ~ "10_october",
+                                term == "monthNov"                                                ~ "11_november",
+                                term == "monthDec"                                                ~ "12_december",
+                                term == "courthouse_hoj"                                          ~ "1_hall_of_justice",
+                                term == "courthouse_family"                                       ~ "2_family_court",
+                                term == "courthouse_palo_alto"                                    ~ "3_palo_alto",
+                                term == "courthouse_sjm"                                          ~ "4_san_jose_municipal",
+                                term == "courthouse_south_county"                                 ~ "5_morgan_hill",
+                                term == "courthouse_otherTRUE"                                    ~ "6_other",
+                                term == "case_type_adult_felony"                                  ~ "1_felony",
+                                term == "case_type_adult_misdemeanor"                             ~ "2_misdemeanor",
+                                term == "case_type_prcs_violation"                                ~ "3_prcs_violation",
+                                term == "case_type_probation_violation"                           ~ "4_probation_violation",
+                                term == "charge_category_assault_offensesTRUE"                    ~ "01_assault",
+                                term == "charge_category_burglary_breaking_enteringTRUE"          ~ "02_burglary",
+                                term == "charge_category_disorderly_conductTRUE"                  ~ "03_disorderly",
+                                term == "charge_category_driving_offenseTRUE"                     ~ "04_driving",
+                                term == "charge_category_drug_narcotic_offensesTRUE"              ~ "05_drugs",
+                                term == "charge_category_counterfeiting_forgeryTRUE"              ~ "06_forgery",
+                                term == "charge_category_fraud_offensesTRUE"                      ~ "07_fraud",
+                                term == "charge_category_homicide_offensesTRUE"                   ~ "08_homicide",
+                                term == "charge_category_kidnapping_abductionTRUE"                ~ "09_kidnapping",
+                                term == "charge_category_larceny_theft_offensesTRUE"              ~ "10_larceny",
+                                term == "charge_category_motor_vehicle_theftTRUE"                 ~ "11_larceny_(vehicular)",
+                                term == "charge_category_probation_parole_violationsTRUE"         ~ "12_probation/parole",
+                                term == "charge_category_robberyTRUE"                             ~ "13_robbery",
+                                term == "charge_category_sex_offenses_forcibleTRUE"               ~ "14_sex_offenses",
+                                term == "charge_category_stolen_property_offensesTRUE"            ~ "15_stolen_property",
+                                term == "charge_category_trespass_of_real_propertyTRUE"           ~ "16_trespassing",
+                                term == "charge_category_weapon_law_violationsTRUE"               ~ "17_weapons",
+                                term == "charge_category_destruction_damage_vandalism_of_propertyTRUE" ~ "18_vandalism",
+                                term == "charge_category_all_other_offensesTRUE"                  ~ "19_other")) %>% 
+  separate(grouping,   c("group_order", "group_name"), sep = "_", extra = "merge") %>% 
+  separate(clean_term, c("term_order",  "term_name"),  sep = "_", extra = "merge") %>% 
+  mutate(across(contains("_name")|contains("model"), ~ str_to_sentence(str_replace_all(., "_", " "))),
+         term_name = if_else(group_name == "Courthouse",
+                             str_to_title(term_name), term_name)) %>% 
+  arrange(group_order, term_order, group_name, term_name) %>% 
+  mutate(rounded_estimate = scales::number(estimate, accuracy = 0.01),
+         rounded_se = scales::number(std.error, accuracy = 0.01),
+         stars = case_when(p.value < 0.001 ~ "***",
+                           p.value < 0.01 ~ "**",
+                           p.value < 0.05 ~ "*",
+                           TRUE ~ ""),
+         displayed_estimate = glue("{rounded_estimate}{stars} ({rounded_se})")) %>% 
+  select(model, group_name, term_name, displayed_estimate) %>% 
+  pivot_wider(id_cols = c(group_name, term_name), 
+              names_from = model, values_from = displayed_estimate) 
+  
+coefficient_kable_raw <- 
+  kable(coefficient_data %>% select(-group_name) %>% rename(Model = term_name),
+        format = "latex",
+        longtable = TRUE, booktabs = TRUE) %>% 
+  pack_rows(index = table(fct_inorder(coefficient_data$group_name))) %>% 
+  row_spec(0, align = "c") %>% 
+  add_header_above(c("Outcome", "Bench Warrant" = 2, "Incarceration")) %>% 
+  add_header_above(c("Timeframe", "First Court Date", "Any Court Date" = 2))
+
+# This last bit removes the first and last line from the kable output
+# so that we can insert captions and other functions
+# within the \longtable call in LaTeX
+coefficient_kable_lines <- (coefficient_kable_raw %>% strsplit(split = "\n"))[[1]]
+coefficient_kable_latex <- 
+  coefficient_kable_lines[4:length(coefficient_kable_lines)-1] %>% 
+  paste(collapse = "\n")
+```
+```{=latex}
+\newcommand\coefficientEstimatesTable{`r coefficient_kable_latex`}
+```
+
+```{r create_interaction_model_tables, include=FALSE}
+
+interaction_coefficient_data <-
+  bind_rows(
+    tidy(model_first_cd_interact_severity)      %>% mutate(model = "(7)"),
+    tidy(model_any_cd_interact_severity)        %>% mutate(model = "(8)"),
+    tidy(model_incarceration_interact_severity) %>% mutate(model = "(9)")
+  ) %>%
+  mutate(
+    grouping = case_when(
+      term == "(Intercept)"                                    ~ "00_intercept",
+      term == "assignment_armshort_texts"                      ~ "01_treatment",
+      term == "case_type_adult_felony"                         ~ "02_case_severity",
+      term == "assignment_armshort_texts:case_type_adult_felony" ~ "03_interaction",
+      TRUE                                                     ~ "99_other"
+    ),
+    clean_term = case_when(
+      term == "(Intercept)"                                    ~ "1_intercept",
+      term == "assignment_armshort_texts"                      ~ "1_reminders",
+      term == "case_type_adult_felony"                         ~ "1_felony",
+      term == "assignment_armshort_texts:case_type_adult_felony" ~ "1_reminders_*_felony",
+      TRUE                                                     ~ term
+    )
+  ) %>%
+  separate(grouping,   c("group_order", "group_name"), sep = "_", extra = "merge") %>%
+  separate(clean_term, c("term_order",  "term_name"),  sep = "_", extra = "merge") %>%
+  mutate(
+    across(contains("_name") | contains("model"),
+           ~ str_to_sentence(str_replace_all(., "_", " "))),
+    term_name = str_to_title(term_name)
+  ) %>%
+  arrange(group_order, term_order, group_name, term_name) %>%
+  mutate(
+    rounded_estimate = number(estimate, accuracy = 0.01),
+    rounded_se       = number(std.error, accuracy = 0.01),
+    stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    ),
+    displayed_estimate = glue("{rounded_estimate}{stars} ({rounded_se})")
+  ) %>%
+  select(model, group_name, term_name, displayed_estimate) %>%
+  pivot_wider(
+    id_cols      = c(group_name, term_name),
+    names_from   = model,
+    values_from  = displayed_estimate
+  )
+
+interaction_coefficient_kable_raw <-
+  kable(
+    interaction_coefficient_data %>% select(-group_name) %>% rename(Model = term_name),
+    format     = "latex",
+    longtable  = TRUE,
+    booktabs   = TRUE
+  ) %>%
+  pack_rows(index = table(fct_inorder(interaction_coefficient_data$group_name))) %>%
+  row_spec(0, align = "c") %>%
+  add_header_above(c("Outcome", "Bench Warrant" = 2, "Incarceration")) %>%
+  add_header_above(c("Timeframe", "First Court Date", "Any Court Date" = 2))
+
+# Strip away the first and last lines for custom insertion:
+interaction_coefficient_kable_lines <- (interaction_coefficient_kable_raw %>% strsplit(split = "\n"))[[1]]
+interaction_coefficient_kable_latex <- 
+  interaction_coefficient_kable_lines[4:(length(interaction_coefficient_kable_lines) - 1)] %>%
+  paste(collapse = "\n")
+```
+```{=latex}
+\newcommand\interactionCoefficientEstimatesTable{`r interaction_coefficient_kable_latex`}
+```
+
+```{r create_sample_stats_table, include=FALSE}
+
+### Entire population
+
+population_group_order <- c("All", "Cell on File", "Experiment", "Control", "Treatment")
+
+sample_stats <- comparison_pops %>% 
+  mutate(courthouse = factor(courthouse, levels = courthouse_vec)) |> 
+  group_by(population) %>% 
+  { map_dfr(calculate_sample_stats, .f = function(f) f(.)) } %>% 
+  mutate(population = factor(population, levels = population_group_order)) %>%
+  arrange(population)
+
+sample_stats_table_data <- sample_stats %>% 
+  select(population, category, value, n, pct) %>% 
+  filter(pct > 0.0025) %>%
+  mutate(value = replace_na(value, "NA"),
+         pct = if_else(pct > 0.01,
+                       scales::percent(pct, accuracy = 1),
+                       scales::percent(pct, accuracy = 0.1)),
+         pct = if_else(category == "Total clients",
+                       scales::number(n, big.mark = ","), 
+                       pct)) %>%
+  select(-n) %>% 
+  pivot_wider(names_from = population, values_from = pct,
+              values_fill = list(pct = "0%")) %>% 
+  arrange(category) %>% 
+  filter(!(category %in% c("Time since phone update (months)",
+                           "Month", "Day of week")))
+
+sample_stats_table_row_labels <- sample_stats_table_data %>% 
+  filter(category != "Total clients") %>% 
+  count(category) %>% 
+  deframe()
+
+sample_stats_table_col_labels <- sample_stats_table_data %>% 
+  select(-category) %>% rename(" " = value) %>% colnames()
+
+sample_stats_kable_raw <- kable(sample_stats_table_data %>% select(-category), 
+      format = "latex", 
+      col.names = sample_stats_table_col_labels,
+      longtable = TRUE, booktabs = TRUE)  %>% 
+  pack_rows(index = sample_stats_table_row_labels,
+            latex_gap_space = "0.5em") %>% 
+  row_spec(nrow(sample_stats_table_data) - 1, extra_latex_after = "\\addlinespace[0.5em]") %>%
+  row_spec(nrow(sample_stats_table_data), bold = TRUE)
+
+# This last bit removes the first and last line from the kable output
+# so that we can insert captions and other functions
+# within the \longtable call in LaTeX
+sample_stats_kable_lines <- (sample_stats_kable_raw %>% strsplit(split = "\n"))[[1]]
+sample_stats_kable_latex <- 
+  sample_stats_kable_lines[4:length(sample_stats_kable_lines)-1] %>% 
+  paste(collapse = "\n")
+```
+```{=latex}
+\newcommand\sampleStatsTable{`r sample_stats_kable_latex`}
+```
+
+```{r create_balance_plots, include=FALSE}
+
+balance_summaries <- comparison_pops %>%
+  filter(population %in% c("Control", "Treatment")) %>% 
+  rename(assignment_arm = population) %>% 
+  group_by(assignment_arm) %>%
+  { map_dfr(calculate_sample_stats, .f = function(f) f(.)) } %>%
+  filter(category != "Total clients", !str_detect(category, " remand "))
+
+limited_balance_plot <- balance_summaries %>%
+  filter(category %in% c("Age (years)", 
+                         "Gender (identifies as male)", 
+                         "Race and ethnicity", 
+                         "Num. bench warrants (prev. 5 years)")) %>% 
+  mutate(value = str_replace(value, "Hispanic", "Hisp.")) %>% 
+  ggplot(aes(x = reorder(value, sort_order), y = pct, 
+             color = assignment_arm, linetype = assignment_arm,
+             shape = assignment_arm,
+             group = assignment_arm)) +
+  facet_wrap(~ category, scales = "free_x", ncol = 2) +
+  # geom_line(size = 0.75) +
+  geom_point(size = 5) + 
+  scale_y_continuous(name = "",
+                     labels = scales::percent,
+                     expand = expansion(mult = c(0.1, .15))) +
+  scale_x_discrete(name = "") +
+  scale_shape_manual(values = c("Control" = 1,
+                                "Treatment" = 4),
+                     labels = c("Control" = "No reminder",
+                                "Treatment" = "Reminder"),
+                     name = "") +
+  scale_color_manual(values = c("Control" = "dimgray",
+                                "Treatment" = "tomato"),
+                     labels = c("Control" = "No reminder",
+                                "Treatment" = "Reminder"),
+                     name = "") +
+  scale_linetype_discrete(guide = "none") +
+  theme(legend.position = c(1, 0.8),
+        legend.justification = c(1, 0),
+        legend.background = element_blank())
+
+ggsave(filename = "output/limited_balance_plot.pdf",
+       limited_balance_plot,
+       width = 7, height = 4)
+
+full_balance_plot <- balance_summaries %>%
+  mutate(value = case_when(value == "Hispanic" ~ "Hisp.",
+                           value == "Hall Of Justice" ~ "HOJ",
+                           value == "Palo Alto" ~ "PA",
+                           value == "South County" ~ "South",
+                           value == "Jan" ~ "Ja",
+                           value == "Feb" ~ "Fe",
+                           value == "Mar" ~ "Mr",
+                           value == "Apr" ~ "Ap",
+                           value == "May" ~ "My",
+                           value == "Jun" ~ "Ju",
+                           value == "Jul" ~ "Jl",
+                           value == "Aug" ~ "Au",
+                           value == "Sep" ~ "Sp",
+                           value == "Oct" ~ "Oc",
+                           value == "Nov" ~ "Nv",
+                           value == "Dec" ~ "Dc",
+                           value == "Misdemeanor" ~ "Misd.",
+                           value == "Supervision Violation" ~ "Viol.",
+                           TRUE ~ value
+                           ),
+         ) %>% 
+  ggplot(aes(x = reorder(value, sort_order), y = pct, 
+             color = assignment_arm, linetype = assignment_arm,
+             shape = assignment_arm,
+             group = assignment_arm)) +
+  facet_wrap(~ category, scales = "free_x", ncol = 3) +
+  # geom_line() +
+  geom_point(size = 3) + 
+  scale_y_continuous(name = "",
+                     labels = scales::percent,
+                     limits = c(0,1)) +
+  scale_x_discrete(name = "") +
+  scale_shape_manual(values = c("Control" = 1,
+                                "Treatment" = 4),
+                     labels = c("Control" = "No reminder",
+                                "Treatment" = "Reminder"),
+                     name = "") +
+  scale_color_manual(values = c("Control" = "dimgray",
+                                "Treatment" = "tomato"),
+                     labels = c("Control" = "No reminder",
+                                "Treatment" = "Reminder"),
+                     name = "") +
+  scale_linetype_discrete(guide = "none") +
+  theme(legend.position = c(1.005, 0.915),
+        legend.justification = c(1, 0),
+        legend.background = element_blank())
+
+ggsave(filename = "output/full_balance_plot.pdf",
+       full_balance_plot,
+       width = 8, height = 8)
+
+```
