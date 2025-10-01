@@ -2,7 +2,7 @@
 
 This repository contains replication materials for our paper, [Automated Reminders Reduce Incarceration for Missed Court Dates: Evidence from a Text Message Experiment](https://alexchohlaswood.com/assets/papers/court_reminders.pdf) (*Science Advances*, 2025).
 
-If you are not viewing this README on GitHub, a more recently updated version may be available at our [online paper repository](https://github.com/chohlasa/court-reminders/).
+If you are not viewing this README on GitHub, a more recently updated version may be available at our [online paper repository](https://github.com/comppolicylab/court-reminders/).
 
 Users can set up the correct R environment by running `renv::restore()` in the root project directory. This will install the packages necessary to run the scripts in this repository.
 
